@@ -21,7 +21,7 @@ use Symfony\Component\Validator\Validator\ValidatorInterface;
 /**
  * Контроллер для создания покупки
  */
-#[Route('/purchase', name: 'create_purchase', methods: ['POST'])]
+#[Route('/purchase', name: 'create_purchase', methods: ['POST'], format: 'json')]
 class PurchaseController extends AbstractController
 {
     public function __construct(
@@ -43,28 +43,34 @@ class PurchaseController extends AbstractController
         Request $request,
     ): JsonResponse
     {
-        // Предполагаем что внутри запроса product taxNumber и paymentProcessor всегда определены
-        $productId = $request->get('product');
-        $taxNumber = $request->get('taxNumber');
-        $couponCode = $request->get('couponCode');
-        $paymentProcessor = PaymentProcessor::tryFrom($request->get('paymentProcessor'));
+        $data = json_decode($request->getContent(), true);
+        if (!isset($data['product']) || !isset($data['taxNumber']) || !isset($data['paymentProcessor'])) {
+            return $this->json(
+                ['message' => 'Not isset product or taxNumber or paymentProcessor'],
+                Response::HTTP_NOT_FOUND
+            );
+        }
+        $productId = $data['product'];
+        $taxNumber = $data['taxNumber'];
+        $couponCode = $data['couponCode'] ?? null;
+
+        $paymentProcessor = PaymentProcessor::tryFrom($data['paymentProcessor']);
+        // Проверим существует ли данный PaymentProcessor
+        if (!$paymentProcessor) {
+            return $this->json(
+                ['message' => 'Not found PaymentProcessor - ' . $request->get('paymentProcessor')],
+                Response::HTTP_NOT_FOUND
+            );
+        }
 
         $responseForTotalPrice = $this->forward('App\Controller\CalculateTotalPriceController', [
             'id' => $productId,
             'taxNumber' => $taxNumber,
             'couponCode' => $couponCode
         ]);
-
         // Проверим ответ от CalculateTotalPriceController
         if ($responseForTotalPrice->getStatusCode() !== Response::HTTP_OK) {
             return $this->json(['message' => $responseForTotalPrice->getContent()], Response::HTTP_NOT_FOUND);
-        }
-        // Проверим существует ли данный PaymentProcessor
-        if (!$paymentProcessor) {
-            return $this->json(
-                ['message' => 'Не найден PaymentProcessor - ' . $request->get('paymentProcessor')],
-                Response::HTTP_NOT_FOUND
-            );
         }
 
         $totalPrice = json_decode($responseForTotalPrice->getContent())?->price;
@@ -84,18 +90,18 @@ class PurchaseController extends AbstractController
         $taxNumber = new TaxNumber($taxNumber);
         $purchase = PurchaseFactory::make($product, $taxNumber, $coupon, $paymentProcessor, $totalPrice);
 
-        // Проверяем валидацию $taxNumber и $purchase
-        if (!$this->validate($taxNumber)) {
+        // Проверяем на валидность $taxNumber и $purchase
+        if ($this->validate($taxNumber)) {
             return $this->json(['message' => (string)$this->validate($taxNumber)], Response::HTTP_NOT_FOUND);
         }
-        if (!$this->validate($purchase)) {
+        if ($this->validate($purchase)) {
             return $this->json(['message' => (string)$this->validate($purchase)], Response::HTTP_NOT_FOUND);
         }
 
         $this->purchaseManager->save($purchase);
 
         return $this->json(
-            ['message' => 'Покупка продукта с id = ' . $product->getId() . ' успешно завершена!'],
+            ['message' => 'Product with id = ' . $product->getId() . ' purchase success!'],
             Response::HTTP_CREATED
         );
     }

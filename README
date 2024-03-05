@@ -1,1 +1,77 @@
-Приветик!
+Мой проект тестового задания
+
+
+--------------------------------------------------------------------------------------------
+
+При первом запуске выполните следующие команды:
+
+git clone https://github.com/honnek/systemeio.git
+cd systemeio
+docker compose build --no-cache
+docker compose up -d
+
+// Установим зависимости
+docker exec -it php bash
+composer install
+
+// Накатим миграции
+php bin/console doctrine:migrations:migrate
+exit;
+
+// Распакуем дамп
+cat app/inserts.sql | docker exec -i postgres psql -U postgres -d db2
+
+
+Приложение готово к работе!
+
+--------------------------------------------------------------------------------------
+
+О том что не сделано:
+
+Много что стоит дописать/изменить, но тратить больше времени уже не совсем рационально. 
+Стоит добавить больше полей в сущности. 
+
+В контроллерах при приеме параметров запроса использовать MapRequestPayload.
+Жаль что исходя из условий задачи нельзя передавать параметры экшнам внутри урла (/purchase/{productId})
+Если бы это было возможно, то мы не захломляли бы код поисками объектов в базе и проверкой на их существование.
+
+Для PaymentProcessor можно было бы сделать общий интерфейс как минимум.
+Можно было бы написать больше Value Object объектов для Money и тд.
+
+
+--------------------------------------------------------------------------------------------
+
+
+Эндпоинты
+
+
+
+calculate-price:
+
+curl -X POST http://localhost:8000/calculate-price     -H "Content-Type: application/json"     -d '{
+    "product": 2,
+    "taxNumber": "DE123456789",
+    "couponCode": "P10"
+}'
+
+
+
+
+
+
+purchase:
+
+curl -X POST http://localhost:8000/purchase     -H "Content-Type: application/json"     -d '{
+    "product": 1,
+    "taxNumber": "IT12345678900",
+    "couponCode": "P10",
+    "paymentProcessor": "paypal"
+}'
+
+
+
+Созданные купоны и товары можно увидеть в базе или в app/inserts.sql 
+
+
+
+

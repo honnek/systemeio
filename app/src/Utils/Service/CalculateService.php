@@ -41,7 +41,7 @@ class CalculateService
         }
 
         if ($totalPrice < 0) {
-            throw new \RuntimeException('Неверный подсчет цены продукта с id = ' . $product->getId());
+            throw new \RuntimeException('Incorrect calculation of the product price with id = ' . $product->getId());
         }
 
         return $totalPrice;
